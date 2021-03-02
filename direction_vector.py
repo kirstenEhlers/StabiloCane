@@ -339,9 +339,9 @@ def plot_data(list_a_x, list_a_y, list_a_z, list_g_x, list_g_y, list_g_z, list_v
  
 
 
-    ax3.plot(list_v_time, list_vel_x, Label = 'x')
-    ax3.plot(list_v_time, list_vel_y, Label = 'y')
-    ax3.plot(list_v_time, list_vel_z, Label = 'z')
+    ax3.plot(list_v_time, list_vel_x, label = 'x')
+    ax3.plot(list_v_time, list_vel_y, label = 'y')
+    ax3.plot(list_v_time, list_vel_z, label = 'z')
     ax3.legend()
     
     ax3.set_ylabel('Velocity (m/s)')
@@ -499,8 +499,6 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
         last_time = curr_time
         curr_time = t
         
-        new_second = False
-        second_counter = 0
 
         if math.floor(last_time) != math.floor(curr_time):
             new_second = True
@@ -535,16 +533,12 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
         velocities_rolling_filter[2].append(vel.z)
         velocities_rolling_filter[3].append(curr_time)
 
-        #will be condition for acceleration - To do
+        trigger_analysis = False
         if curr_time == max_time:
-            acc = np.multiply(acc_sum, 1/i)
-            #current_velocity = track_velocity(acc, last_acc,current_velocity, last_time,curr_time)
-            #vel = velocity(curr_time, current_velocity[0][0], current_velocity[1][0], current_velocity[2][0])
-            #list_vel_x.append(vel.x)
-            #list_vel_y.append(vel.y)
-            #list_vel_z.append(vel.z)
+            trigger_analysis = True
+        #will be condition for acceleration - To do
+        if trigger_analysis:
             
-            #!!!!
             times = velocities_rolling_filter[3]
 
             for k in range(0,3):
@@ -629,8 +623,7 @@ def main():
     sys.stdout.write("hello world\n")
     [list_gyro_data, list_acc_data] = read_data()
 
-    for b in [3]:
-        for a in [0.0102]:
-            track(list_gyro_data, list_acc_data,a,b)
+    
+    track(list_gyro_data, list_acc_data,0.0102,3)
 
 main()
