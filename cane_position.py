@@ -47,7 +47,7 @@ def activity_start_range(acc_x, acc_y, acc_z, upright_positions):
     return (low_x, high_x), (low_y, high_y), (low_z, high_z)
 
 """returns the timestamps that should start/refresh the scan for obstacles"""
-def scan_time_range(timestamp, acc_x, acc_y, acc_z): 
+def scan_time_range(timestamp, acc_x, acc_y, acc_z, thresholds): 
     stand_upright_times = []
     for i in range(0,len(timestamp)): 
         # start scanning after the initial 3s calibration time
@@ -69,20 +69,44 @@ def scan_time_range(timestamp, acc_x, acc_y, acc_z):
 
     return scan_times
 
+# Instantaneous real-time scanning
+def scan_time_range_instant(timestamps, acc_x, acc_y, acc_z, thresholds,curr_time): 
+    
+    scan_start = False
+    i=0
+    for t in range(0,len(timestamps)):
+        if curr_time == timestamps[t]:
+            i=t
+        elif t> 0:
+            if curr_time < timestamps[t] and curr_time > timestamps[t-1]:
+                i = t
+
+    if (acc_x[i]>thresholds[0][0] and acc_x[i]<thresholds[0][1]) and \
+                (acc_y[i]>thresholds[1][0] and acc_y[i]<thresholds[1][1]) and \
+                (acc_z[i]>thresholds[2][0] and acc_z[i]<thresholds[2][1]):
+        if (acc_x[i-1]>thresholds[0][0] and acc_x[i-1]<thresholds[0][1]) and \
+                (acc_y[i-1]>thresholds[1][0] and acc_y[i-1]<thresholds[1][1]) and \
+                (acc_z[i-1]>thresholds[2][0] and acc_z[i-1]<thresholds[2][1]): 
+                scan_start = True                 
+    
+
+    return scan_start
 """Execute main"""
-acc_dataFile = pd.read_csv('acc_cane.csv')
-timestamp = acc_dataFile['time'] 
-acc_x = acc_dataFile['gFx'] 
-acc_y = acc_dataFile['gFy'] 
-acc_z = acc_dataFile['gFz'] 
 
-# plot_acc(acc_x)
-# plot_acc(acc_y)
-# plot_acc(acc_z)
+def cane_position_main():
+    acc_dataFile = pd.read_csv('acc_cane.csv')
+    timestamp = acc_dataFile['time'] 
+    acc_x = acc_dataFile['gFx'] 
+    acc_y = acc_dataFile['gFy'] 
+    acc_z = acc_dataFile['gFz'] 
 
-# perform calculations of upright position and thresholds
-upright_positions = calibrate_cane_upright(timestamp, acc_x, acc_y, acc_z)
-thresholds = activity_start_range(acc_x, acc_y, acc_z, upright_positions)
+    # plot_acc(acc_x)
+    # plot_acc(acc_y)
+    # plot_acc(acc_z)
 
-# time points that represent a new step and to refresh scanning for obstacles
-scan_time = scan_time_range(timestamp, acc_x, acc_y, acc_z)
+    # perform calculations of upright position and thresholds
+    upright_positions = calibrate_cane_upright(timestamp, acc_x, acc_y, acc_z)
+    thresholds = activity_start_range(acc_x, acc_y, acc_z, upright_positions)
+
+    # time points that represent a new step and to refresh scanning for obstacles
+    scan_time = scan_time_range(timestamp, acc_x, acc_y, acc_z, thresholds)

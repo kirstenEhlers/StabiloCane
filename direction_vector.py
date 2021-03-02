@@ -9,6 +9,8 @@ from scipy.signal import butter, lfilter
 import scipy.integrate as integrate
 from scipy import signal
 from scipy import fft, arange
+import cane_position as cane
+import pandas as pd
 
 #Settings
 num_skip = 2000
@@ -21,7 +23,8 @@ threshold_factor = 0
 num_ave =1000
 f_high = 2
 f_low = 10
-
+height = 0.511 #m
+step_length = 0.695 #m
 
 class gyro_measure:
     def __init__(self,timestamp, angX, angY, angZ):
@@ -367,68 +370,6 @@ def plotSpectrum(y,Fs, name):
     plt.show()
 
 
-def test_ideal(list_a_unfiltered_x, list_a_unfiltered_y, list_a_unfiltered_z, list_unfiltered_time):
-
-    box_pts = 100
-    box = np.ones(box_pts)/box_pts
-    x_smooth = list_a_unfiltered_x#np.convolve(list_a_unfiltered_x, box, mode='same')
-    y_smooth = list_a_unfiltered_y #np.convolve(list_a_unfiltered_y, box, mode='same')
-    z_smooth = list_a_unfiltered_z # np.convolve(list_a_unfiltered_z, box, mode='same')
-    ax = interp1d(list_unfiltered_time, x_smooth, kind='cubic')
-    ay = interp1d(np.add(list_unfiltered_time, 2), y_smooth, kind='cubic')
-    az = interp1d(list_unfiltered_time,z_smooth, kind='cubic')
-
-    #normal_cutoff = cutoff / nyq
-    # Get the filter coefficients 
-    #b, a = butter(2, 0.5, btype='low', analog=True)
-    #ax = lfilter(b, a, ax)
-
-    sig = az.y
-    sos = signal.butter(10, f_low, 'low', fs=500, output='sos')
-
-    filteredz = signal.sosfilt(sos, sig)
-
-    sig = ax.y
-    sos = signal.butter(10, f_low, 'low', fs=500, output='sos')
-
-    filteredx = signal.sosfilt(sos, sig)
-
-
-    time = list_unfiltered_time
-    x= filteredx
-    finterp = InterpolatedUnivariateSpline(time,x, k = 1)
-    tt = time
-    vx = [finterp.integral(0, t) for t in tt]
-    sig = vx
-    sos = signal.butter(10, f_high, 'high', fs=500, output='sos')
-
-    vx = signal.sosfilt(sos, sig)
-
-    y= filteredz
-    finterp = InterpolatedUnivariateSpline(time,y, k = 1)
-    tt = time
-    vy = [finterp.integral(0, t) for t in tt]
-
-    z= filteredz
-    finterp = InterpolatedUnivariateSpline(time,z, k = 1)
-    tt = time
-    vz = [finterp.integral(0, t) for t in tt]
-    sig = vz
-    sos = signal.butter(10, f_high, 'high', fs=500, output='sos')
-
-    vz = signal.sosfilt(sos, sig)
-
-    #plt.plot(ax.x, ax.y, label='ax')
-    #plt.plot(ay.x, ay.y, label ='ay')
-    plt.plot(az.x, filteredz, label ='azf')
-    #plt.plot(az.x, az.y, label ='az')
-    plt.plot(az.x, filteredx, label ='axf')
-    #plt.plot(ax.x, ax.y, label ='ax')
-    plt.plot(tt,vx, label = 'vx')
-    #plt.plot(tt,vy, label='vy')
-    plt.plot(tt,vz, label='vz')
-    plt.legend()
-    plt.show()
 def get_pos(list_vel_x, list_vel_y, list_vel_z, list_time):
     x =[]
     y = []
@@ -455,7 +396,7 @@ def get_pos(list_vel_x, list_vel_y, list_vel_z, list_time):
     plt.legend()
     plt.show()
 
-def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
+def track(gyro_list, acc_list, limit_high_pass, limit_low_pass, threshold_cane, cane_acc_x, cane_acc_y, cane_acc_z, timestamps):
 
     list_vel_x = []
     list_vel_y = []
@@ -463,9 +404,6 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
     list_a_x = []
     list_a_y = []
     list_a_z = []
-    list_g_x = []
-    list_g_y = []
-    list_g_z = []
     list_time = []
     list_auf_x = []
     list_auf_y = []
@@ -481,17 +419,14 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
     acc_i =-1
     gyro_i = -1
     current_angles = gyro_measure(curr_time, initial_roll, initial_pitch, initial_yaw)
-    
     last_acc = [[0],[0],[0]]
     acc = [[0],[0],[0]]
     acc_uf = acc
     thresholds = get_thresholds(gyro_list, acc_list)
-    gyro_last = [[0],[0],[0]]
     gyro = [[0],[0],[0]]
     max_time = get_max(gyro_list[-3].time, acc_list[-3].time)
     current_velocity = [[0],[0],[0]]
     fs = len(acc_list)/max_time
-    acc_sum = [[0],[0],[0]]
     i = 0
     
     while curr_time < max_time:
@@ -499,9 +434,6 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
         last_time = curr_time
         curr_time = t
         
-
-        if math.floor(last_time) != math.floor(curr_time):
-            new_second = True
 
         last_gyro = gyro
         acc = [[accX], [accY], [accZ]]
@@ -533,12 +465,15 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
         velocities_rolling_filter[2].append(vel.z)
         velocities_rolling_filter[3].append(curr_time)
 
-        trigger_analysis = False
+        
+        trigger_analysis = True
         if curr_time == max_time:
-            trigger_analysis = True
+            trigger_analysis = cane.scan_time_range_instant(timestamps, cane_acc_x, cane_acc_y, cane_acc_z, threshold_cane,curr_time)
+        else:
+            trigger_analysis = False
+
         #will be condition for acceleration - To do
         if trigger_analysis:
-            
             times = velocities_rolling_filter[3]
 
             for k in range(0,3):
@@ -573,7 +508,10 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
                         positions[3].append(t)
                         accelerations[3].append(t)
 
-                
+            #SCANNING PARAMETERS FOR AKANSKHA
+            curr_vel = [[velocities[0][-1]],[velocities[1][-1]],[velocities[2][-1]]]
+            height 
+            step_length
 
             #resetting
             for j in range(0,4):
@@ -582,20 +520,11 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
             i = 0
             acc_sum = [[0],[0],[0]]
             last_acc = acc
+        else:
+            f = 0
+
+
         
-        #storage for data analysis
-        list_time.append(curr_time)
-        list_g_x.append(current_angles.roll * 180 / math.pi)
-        list_g_y.append(current_angles.pitch* 180 / math.pi)
-        list_g_z.append(current_angles.yaw* 180 / math.pi)
-        list_a_x.append(acc[0][0])
-        list_a_y.append(acc[1][0])
-        list_a_z.append(acc[2][0])
-
-    #for k in range(0,3):
-        #plotSpectrum(velocities[k], fs, 'Vel' + str(k))
-        #plotSpectrum(accelerations[k], fs, 'Acc' + str(k))
-
     list_vel_x = velocities[0]
     list_vel_y = velocities[1]
     list_vel_z = velocities[2]
@@ -611,19 +540,26 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass):
     list_p_y = positions[1]
     list_p_z = positions[2]
     list_p_time = positions[3]
-    a = interp1d(list_time, list_a_x, kind='nearest')
-
+  
     plot_data(list_a_x, list_a_y, list_a_z, list_p_x, list_p_y, list_p_z, list_vel_x, list_vel_y, list_vel_z, list_time, list_v_time, list_p_time)
     
-    #get_pos(list_vel_x, list_vel_y, list_vel_z, list_time)
-    #test_ideal(list_a_x, list_a_y, list_a_z, list_time)
-    #test_ideal(list_auf_x, list_auf_y, list_auf_z, list_tuf)
     
 def main():
     sys.stdout.write("hello world\n")
     [list_gyro_data, list_acc_data] = read_data()
 
+    #calibration steps for scanning times
+    acc_dataFile = pd.read_csv('acc_cane.csv')
+    timestamps = acc_dataFile['time'] 
+    cane_acc_x = acc_dataFile['gFx'] 
+    cane_acc_y = acc_dataFile['gFy'] 
+    cane_acc_z = acc_dataFile['gFz'] 
+    upright_positions = cane.calibrate_cane_upright(timestamps, cane_acc_x, cane_acc_y, cane_acc_z)
+    thresholds_cane = cane.activity_start_range(cane_acc_x, cane_acc_y, cane_acc_z, upright_positions)
+
     
-    track(list_gyro_data, list_acc_data,0.0102,3)
+    track(list_gyro_data, list_acc_data,0.0102,3, thresholds_cane, cane_acc_z, cane_acc_y, cane_acc_z, timestamps)
+
 
 main()
+
