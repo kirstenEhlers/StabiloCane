@@ -8,8 +8,9 @@ from scipy.interpolate.fitpack2 import InterpolatedUnivariateSpline
 from scipy.signal import butter, lfilter
 import scipy.integrate as integrate
 from scipy import signal
-from scipy import fft, arange
+from scipy import fft
 import cane_position as cane
+import Obstacle_Detection as obstacle
 import pandas as pd
 
 #Settings
@@ -214,12 +215,12 @@ def track_velocity(acc, last_acc, current_velocity, last_time, time):
 
     X = change
     Y = current_velocity
-    sum = [[X[i][j] + Y[i][j]  for j in range(len(X[0]))] for i in range(len(X))]
+    sum = [[X[i][j] + Y[i][j] for j in range(len(X[0]))] for i in range(len(X))]
 
     return sum
 
 def sum_matrices(X, Y):
-    return [[X[i][j] + Y[i][j]  for j in range(len(X[0]))] for i in range(len(X))]
+    return [[X[i][j] + Y[i][j] for j in range(len(X[0]))] for i in range(len(X))]
 
 def get_next_rates_of_change(acc_i, gyro_i, gyro_list, acc_list):
 
@@ -442,12 +443,12 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass, threshold_cane, 
         
         acc_uf = rotate_accelerations(current_angles, acc)
         acc = filtered_acclerations(acc, thresholds)
-        acc= rotate_accelerations(current_angles, acc)
+        acc = rotate_accelerations(current_angles, acc)
         list_auf_x.append(acc_uf[0][0])
         list_auf_y.append(acc_uf[1][0])
         list_auf_z.append(acc_uf[2][0])
         list_tuf.append(curr_time)
-        acc_sum = sum_matrices(acc_sum, acc)
+        #acc_sum = sum_matrices(acc_sum, acc)
         
 
         i = i + 1
@@ -508,10 +509,15 @@ def track(gyro_list, acc_list, limit_high_pass, limit_low_pass, threshold_cane, 
                         positions[3].append(t)
                         accelerations[3].append(t)
 
-            #SCANNING PARAMETERS FOR AKANSKHA
-            curr_vel = [[velocities[0][-1]],[velocities[1][-1]],[velocities[2][-1]]]
-            height 
-            step_length
+            #SCANNING PARAMETERS FOR AKANKSHA
+            ax = [velocities[0][-1]][0]
+            ay = [velocities[1][-1]][0]
+            az = [velocities[2][-1]][0]
+            curr_vel = [ax, ay, az]
+            print("Obstacle detection in progress...")
+            print(obstacle.detect_obstacle(curr_vel))
+            #height
+            #step_length
 
             #resetting
             for j in range(0,4):

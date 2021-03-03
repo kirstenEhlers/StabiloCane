@@ -100,9 +100,9 @@ def cane_position_main():
     acc_y = acc_dataFile['gFy'] 
     acc_z = acc_dataFile['gFz'] 
 
-    # plot_acc(acc_x)
-    # plot_acc(acc_y)
-    # plot_acc(acc_z)
+    plot_acc(acc_x)
+    plot_acc(acc_y)
+    plot_acc(acc_z)
 
     # perform calculations of upright position and thresholds
     upright_positions = calibrate_cane_upright(timestamp, acc_x, acc_y, acc_z)
